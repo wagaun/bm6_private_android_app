@@ -52,5 +52,8 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.core.ktx)
 
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+
     androidTestImplementation(libs.compose.ui.test.junit4)
 }

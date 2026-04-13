@@ -27,12 +27,50 @@ The official BM6 app collects invasive telemetry including GPS and device data. 
    ./gradlew assembleDebug
    ```
 
+## Running Tests
+
+```
+./gradlew testDebugUnitTest
+```
+
+Tests use [Robolectric](https://robolectric.org/) to simulate different Android API levels without a device.
+
 ## Tech Stack
 
-- Kotlin
-- Jetpack Compose (Material 3)
+- Kotlin 2.1.10
+- Jetpack Compose (Material 3, BOM 2025.04.00)
 - Android BLE API
 - Min SDK 26 / Target SDK 36
+- AGP 8.9.0 / Gradle 8.11.1
+- JDK 17
+
+## Project Structure
+
+```
+app/src/main/java/com/bm6/monitor/
+├── MainActivity.kt              # Entry point with Compose UI
+├── ble/
+│   └── BlePermissionHelper.kt   # BLE permission handling (API 26-30 + 31+)
+└── ui/theme/
+    ├── Color.kt                 # Green color palette
+    ├── Theme.kt                 # Material 3 theme with dynamic color
+    └── Type.kt                  # Typography
+
+app/src/test/java/com/bm6/monitor/
+└── ble/
+    └── BlePermissionHelperTest.kt  # Robolectric tests for permission logic
+```
+
+## BLE Permissions
+
+The app handles two different Android BLE permission models:
+
+| API Level | Permissions Required |
+|---|---|
+| 26–30 | `BLUETOOTH`, `BLUETOOTH_ADMIN`, `ACCESS_FINE_LOCATION` |
+| 31+ | `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT` |
+
+Location is required on older Android versions because BLE scan results can infer physical location. Android 12+ introduced dedicated BLE permissions with a `neverForLocation` flag.
 
 ## Protocol
 
