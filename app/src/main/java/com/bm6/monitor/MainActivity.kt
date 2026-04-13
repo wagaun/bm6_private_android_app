@@ -1,5 +1,6 @@
 package com.bm6.monitor
 
+import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -17,7 +18,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.bm6.monitor.ble.BlePermissionHelper
+import com.bm6.monitor.ble.BleStatus
+import com.bm6.monitor.ble.BleStatusChecker
 import com.bm6.monitor.ui.PermissionScreen
 import com.bm6.monitor.ui.theme.BM6MonitorTheme
 
@@ -30,7 +35,16 @@ class MainActivity : ComponentActivity() {
                 var permissionsGranted by remember {
                     mutableStateOf(BlePermissionHelper.hasPermissions(this))
                 }
+                var bleStatus by remember {
+                    mutableStateOf(BleStatusChecker.check(this))
+                }
                 var showRationale by remember { mutableStateOf(false) }
+
+                // Re-check status when returning from settings or enabling bluetooth
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+                    permissionsGranted = BlePermissionHelper.hasPermissions(this@MainActivity)
+                    bleStatus = BleStatusChecker.check(this@MainActivity)
+                }
 
                 val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions()
@@ -39,11 +53,13 @@ class MainActivity : ComponentActivity() {
                     if (!permissionsGranted) {
                         showRationale = true
                     }
+                    bleStatus = BleStatusChecker.check(this)
                 }
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     PermissionScreen(
                         permissionsGranted = permissionsGranted,
+                        bleStatus = bleStatus,
                         showRationale = showRationale,
                         onRequestPermissions = {
                             permissionLauncher.launch(
@@ -57,6 +73,9 @@ class MainActivity : ComponentActivity() {
                                     Uri.fromParts("package", packageName, null),
                                 )
                             )
+                        },
+                        onEnableBluetooth = {
+                            startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
                         },
                         modifier = Modifier.padding(innerPadding),
                     )

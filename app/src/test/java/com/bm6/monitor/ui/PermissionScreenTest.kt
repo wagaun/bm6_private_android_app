@@ -3,6 +3,7 @@ package com.bm6.monitor.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import com.bm6.monitor.ble.BleStatus
 import com.bm6.monitor.ui.theme.BM6MonitorTheme
 import org.junit.Rule
 import org.junit.Test
@@ -75,6 +76,57 @@ class PermissionScreenTest {
             }
         }
 
+        composeTestRule.onNodeWithText("Open Settings").assertIsDisplayed()
+    }
+
+    @Test
+    fun `shows BLE not supported message`() {
+        composeTestRule.setContent {
+            BM6MonitorTheme {
+                PermissionScreen(
+                    permissionsGranted = false,
+                    bleStatus = BleStatus.BleNotSupported,
+                    onRequestPermissions = {},
+                    onOpenSettings = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("BLE Not Supported").assertIsDisplayed()
+        composeTestRule.onNodeWithText("does not support Bluetooth Low Energy", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `shows Bluetooth disabled message with enable button`() {
+        composeTestRule.setContent {
+            BM6MonitorTheme {
+                PermissionScreen(
+                    permissionsGranted = false,
+                    bleStatus = BleStatus.BluetoothDisabled,
+                    onRequestPermissions = {},
+                    onOpenSettings = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Bluetooth Disabled").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enable Bluetooth").assertIsDisplayed()
+    }
+
+    @Test
+    fun `shows Location disabled message on pre-API 31`() {
+        composeTestRule.setContent {
+            BM6MonitorTheme {
+                PermissionScreen(
+                    permissionsGranted = false,
+                    bleStatus = BleStatus.LocationDisabled,
+                    onRequestPermissions = {},
+                    onOpenSettings = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Location Services Required").assertIsDisplayed()
         composeTestRule.onNodeWithText("Open Settings").assertIsDisplayed()
     }
 }
