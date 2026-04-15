@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -24,7 +26,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.bm6.monitor.ble.ConnectionState
 import com.bm6.monitor.ble.DiscoveredDevice
+import com.bm6.monitor.ble.ReadingState
 import com.bm6.monitor.ble.ScanState
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun BleScreen(
@@ -32,10 +38,12 @@ fun BleScreen(
     connectionState: ConnectionState,
     devices: List<DiscoveredDevice>,
     characteristicsFound: Boolean,
+    readingState: ReadingState,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
     onDeviceClick: (DiscoveredDevice) -> Unit,
     onDisconnect: () -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -44,7 +52,7 @@ fun BleScreen(
             .padding(16.dp),
     ) {
         // Connection status banner
-        ConnectionBanner(connectionState, characteristicsFound, onDisconnect)
+        ConnectionBanner(connectionState, characteristicsFound, readingState, onDisconnect, onRefresh)
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -102,7 +110,9 @@ fun BleScreen(
 private fun ConnectionBanner(
     connectionState: ConnectionState,
     characteristicsFound: Boolean,
+    readingState: ReadingState,
     onDisconnect: () -> Unit,
+    onRefresh: () -> Unit,
 ) {
     when (connectionState) {
         ConnectionState.Connecting -> {
@@ -131,24 +141,21 @@ private fun ConnectionBanner(
                 ),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "Connected",
                             style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
                         )
-                        if (characteristicsFound) {
-                            Text(
-                                text = "BM6 characteristics found",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
+                        OutlinedButton(onClick = onDisconnect) {
+                            Text("Disconnect")
                         }
                     }
-                    OutlinedButton(onClick = onDisconnect) {
-                        Text("Disconnect")
+
+                    if (characteristicsFound) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ReadingContent(readingState, onRefresh)
                     }
                 }
             }
@@ -168,6 +175,63 @@ private fun ConnectionBanner(
             }
         }
         ConnectionState.Disconnected -> { /* No banner */ }
+    }
+}
+
+@Composable
+private fun ReadingContent(
+    readingState: ReadingState,
+    onRefresh: () -> Unit,
+) {
+    when (readingState) {
+        ReadingState.Idle -> { /* Waiting for first read */ }
+        ReadingState.Reading -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .height(16.dp)
+                        .width(16.dp),
+                    strokeWidth = 2.dp,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Reading...",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        is ReadingState.Success -> {
+            val reading = readingState.reading
+            Text(
+                text = "Voltage: ${"%.2f".format(reading.voltageVolts)}V",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "Temperature: ${reading.temperatureCelsius}°C",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+            Text(
+                text = "Last updated: ${timeFormat.format(Date(reading.timestamp))}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = onRefresh) {
+                Text("Refresh")
+            }
+        }
+        is ReadingState.Error -> {
+            Text(
+                text = readingState.message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = onRefresh) {
+                Text("Retry")
+            }
+        }
     }
 }
 
