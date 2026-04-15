@@ -7,8 +7,11 @@ import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
@@ -19,7 +22,7 @@ enum class ConnectionState {
     Error,
 }
 
-class BleConnectionManager {
+class BleConnectionManager : BleConnection {
 
     companion object {
         // BM6 BLE characteristic UUIDs
@@ -31,7 +34,10 @@ class BleConnectionManager {
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     private val _characteristicsFound = MutableStateFlow(false)
-    val characteristicsFound: StateFlow<Boolean> = _characteristicsFound.asStateFlow()
+    override val characteristicsFound: StateFlow<Boolean> = _characteristicsFound.asStateFlow()
+
+    private val _notificationData = MutableSharedFlow<ByteArray>()
+    override val notificationData: SharedFlow<ByteArray> = _notificationData.asSharedFlow()
 
     val isConnected: Boolean get() = _connectionState.value == ConnectionState.Connected
     var connectedDeviceAddress: String? = null
@@ -97,6 +103,14 @@ class BleConnectionManager {
     fun close() {
         gatt?.close()
         cleanup()
+    }
+
+    @SuppressLint("MissingPermission")
+    override suspend fun writeCharacteristic(data: ByteArray): Boolean {
+        val characteristic = writeCharacteristic ?: return false
+        val bluetoothGatt = gatt ?: return false
+        characteristic.value = data
+        return bluetoothGatt.writeCharacteristic(characteristic)
     }
 
     private fun cleanup() {
