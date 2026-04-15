@@ -67,16 +67,19 @@ class MainActivity : ComponentActivity() {
                         val devices by bleViewModel.discoveredDevices.collectAsState()
                         val connectionState by bleViewModel.connectionState.collectAsState()
                         val charsFound by bleViewModel.characteristicsFound.collectAsState()
+                        val readingState by bleViewModel.readingState.collectAsState()
 
                         BleScreen(
                             scanState = scanState,
                             connectionState = connectionState,
                             devices = devices,
                             characteristicsFound = charsFound,
+                            readingState = readingState,
                             onStartScan = { bleViewModel.startScan(this@MainActivity) },
                             onStopScan = { bleViewModel.stopScan() },
                             onDeviceClick = { bleViewModel.connectToDevice(this@MainActivity, it) },
                             onDisconnect = { bleViewModel.disconnect() },
+                            onRefresh = { bleViewModel.refreshReading() },
                             modifier = Modifier.padding(innerPadding),
                         )
                     } else {

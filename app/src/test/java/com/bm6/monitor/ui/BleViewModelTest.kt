@@ -1,10 +1,20 @@
 package com.bm6.monitor.ui
 
+import com.bm6.monitor.ble.Bm6DataReader
+import com.bm6.monitor.ble.Bm6Protocol
 import com.bm6.monitor.ble.BleConnectionManager
 import com.bm6.monitor.ble.BleScanner
 import com.bm6.monitor.ble.ConnectionState
 import com.bm6.monitor.ble.DiscoveredDevice
+import com.bm6.monitor.ble.FakeBleConnection
+import com.bm6.monitor.ble.ReadingState
 import com.bm6.monitor.ble.ScanState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,19 +24,31 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class BleViewModelTest {
 
+    private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var scanner: BleScanner
     private lateinit var connectionManager: BleConnectionManager
+    private lateinit var fakeConnection: FakeBleConnection
+    private lateinit var dataReader: Bm6DataReader
     private lateinit var viewModel: BleViewModel
 
     @Before
     fun setup() {
+        Dispatchers.setMain(testDispatcher)
         scanner = BleScanner()
         connectionManager = BleConnectionManager()
-        viewModel = BleViewModel(scanner, connectionManager)
+        fakeConnection = FakeBleConnection()
+        dataReader = Bm6DataReader(fakeConnection, Bm6Protocol())
+        viewModel = BleViewModel(scanner, connectionManager, dataReader)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     @Test
@@ -87,5 +109,29 @@ class BleViewModelTest {
 
         connectionManager.setConnectionState(ConnectionState.Connected)
         assertTrue(viewModel.isConnected)
+    }
+
+    @Test
+    fun `initial reading state is Idle`() {
+        assertEquals(ReadingState.Idle, viewModel.readingState.value)
+    }
+
+    @Test
+    fun `readingState flows through from data reader`() {
+        // DataReader's state is exposed through the ViewModel
+        assertEquals(ReadingState.Idle, viewModel.readingState.value)
+    }
+
+    @Test
+    fun `reading state resets to Idle on disconnect`() {
+        // First connect, then trigger a reading error
+        connectionManager.setConnectionState(ConnectionState.Connected)
+        fakeConnection.writeResult = false
+        viewModel.refreshReading()
+        assertTrue(viewModel.readingState.value is ReadingState.Error)
+
+        // Disconnect should reset reading state
+        connectionManager.setConnectionState(ConnectionState.Disconnected)
+        assertEquals(ReadingState.Idle, viewModel.readingState.value)
     }
 }
