@@ -1,5 +1,8 @@
 package com.bm6.monitor.ble
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -83,5 +86,33 @@ class BleConnectionManagerTest {
         assertTrue(states.contains(ConnectionState.Connecting))
         assertTrue(states.contains(ConnectionState.Connected))
         assertTrue(states.contains(ConnectionState.Error))
+    }
+
+    @Test
+    fun `writeCharacteristic returns false when not connected`() = runBlocking {
+        assertFalse(manager.writeCharacteristic(byteArrayOf(0x01)))
+    }
+
+    @Test
+    fun `emitNotificationData delivers bytes to notificationData flow`() = runBlocking {
+        val testData = byteArrayOf(0x01, 0x02, 0x03)
+
+        val deferred = async {
+            manager.notificationData.first()
+        }
+
+        // Give collector time to subscribe
+        kotlinx.coroutines.yield()
+
+        manager.emitNotificationData(testData)
+
+        val received = deferred.await()
+        assertTrue(testData.contentEquals(received))
+    }
+
+    @Test
+    fun `implements BleConnection interface`() {
+        val connection: BleConnection = manager
+        assertFalse(connection.characteristicsFound.value)
     }
 }

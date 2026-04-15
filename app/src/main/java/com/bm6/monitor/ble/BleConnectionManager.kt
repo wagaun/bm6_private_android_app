@@ -5,8 +5,10 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -28,6 +30,7 @@ class BleConnectionManager : BleConnection {
         // BM6 BLE characteristic UUIDs
         val UUID_CHAR_WRITE: UUID = UUID.fromString("0000fff3-0000-1000-8000-00805f9b34fb")
         val UUID_CHAR_NOTIFY: UUID = UUID.fromString("0000fff4-0000-1000-8000-00805f9b34fb")
+        private val UUID_CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     }
 
     private val _connectionState = MutableStateFlow(ConnectionState.Disconnected)
@@ -65,6 +68,7 @@ class BleConnectionManager : BleConnection {
             }
         }
 
+        @SuppressLint("MissingPermission")
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 _connectionState.value = ConnectionState.Error
@@ -81,7 +85,29 @@ class BleConnectionManager : BleConnection {
                 }
             }
 
+            // Enable notifications on FFF4 so the device sends data
+            notifyCharacteristic?.let { char ->
+                gatt.setCharacteristicNotification(char, true)
+                val descriptor = char.getDescriptor(UUID_CCCD)
+                descriptor?.let {
+                    it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    gatt.writeDescriptor(it)
+                }
+            }
+
             _characteristicsFound.value = writeCharacteristic != null && notifyCharacteristic != null
+        }
+
+        @Deprecated("Deprecated in API 33, but needed for API 26-32 support")
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+        ) {
+            if (characteristic.uuid == UUID_CHAR_NOTIFY) {
+                characteristic.value?.let { data ->
+                    runBlocking { _notificationData.emit(data) }
+                }
+            }
         }
     }
 
@@ -128,5 +154,10 @@ class BleConnectionManager : BleConnection {
     // Visible for testing
     fun setCharacteristicsFound(found: Boolean) {
         _characteristicsFound.value = found
+    }
+
+    // Visible for testing
+    suspend fun emitNotificationData(data: ByteArray) {
+        _notificationData.emit(data)
     }
 }
